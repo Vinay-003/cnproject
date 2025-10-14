@@ -1,50 +1,81 @@
-# Welcome to your Expo app 👋
+# Air Quality monitoring app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native application for monitoring and visualizing air quality and environmental data.
 
-## Get started
+## Overview
 
-1. Install dependencies
+This air quality monitor is a cross-platform mobile application built with React Native and Expo that provides real-time monitoring of air quality metrics. The app displays current readings and historical trends for:
 
-   ```bash
-   npm install
-   ```
+- Air Quality Index (AQI)
+- CO₂ levels (ppm)
+- Temperature (°C)
+- Humidity (%)
 
-2. Start the app
+## Features
 
-   ```bash
-   npx expo start
-   ```
+- Real-time data visualization with automatic polling
+- AQI status indicators with color coding
+- Interactive gauge visualization
+- Historical trend charts for all metrics
+- Responsive design with light/dark mode support
+- Pull-to-refresh functionality
 
-In the output, you'll find options to open the app in a
+## Technical Implementation
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+The application is built using:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- React Native / Expo
+- TypeScript
+- File-based routing
+- SVG-based data visualizations
+- Parallel scroll views with parallax effects
 
-## Get a fresh project
+## Project Structure
 
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+WeatherMonitor/
+├── app/
+│   ├── (tabs)/
+│   │   ├── index.tsx      # Home screen with main dashboard
+│   │   ├── explore.tsx    # Exploration/info screen
+│   │   └── _layout.tsx    # Tab navigation configuration
+│   ├── _layout.tsx        # Root layout with theme provider
+│   └── modal.tsx          # Modal screen component
+├── components/
+│   ├── themed-text.tsx
+│   ├── themed-view.tsx
+│   ├── parallax-scroll-view.tsx
+│   └── ...
+└── ...
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Data Flow
 
-## Learn more
+1. The app fetches air quality data from a configurable API endpoint
+2. Data is polled at regular intervals (default: 15 seconds)
+3. The UI updates in real-time with new readings
+4. Historical data is stored and displayed as trend lines
 
-To learn more about developing your project with Expo, look at the following resources:
+## Setup and Development
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Start the development server with `npm start`
+4. Open on iOS, Android, or web using the Expo tools
 
-## Join the community
+## Environment Configuration
 
-Join our community of developers creating universal apps.
+The application uses environment variables for configuration:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `EXPO_PUBLIC_API_BASE`: Base URL for the API (defaults to http://localhost:3000)
+
+## Future Improvements
+
+- Add location-based monitoring
+- Implement push notifications for unhealthy air quality alerts
+- Add customizable thresholds and alert settings
+- Expand historical data analysis
+
+## License
+
+[MIT License]
