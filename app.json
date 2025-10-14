@@ -43,6 +43,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "EXPO_PUBLIC_API_BASE": {
+        "default": "http://localhost:3000"
+      }
     }
   }
 }
