@@ -268,48 +268,6 @@ Humidity_Score:
 - **201-300**: Very Unhealthy (Purple)
 - **300+**: Hazardous (Maroon)
 
----
-
-## 🚀 Setup & Deployment Guide
-
-### Step 1: Start Backend Server
-```bash
-cd /home/mylappy/Desktop/cnproject/project
-npm run start:api
-```
-Server starts on port 3000, accessible at `http://192.168.1.12:3000`
-
-### Step 2: Run Setup Script (One-time)
-```bash
-npm run setup
-```
-This creates:
-- Demo user account
-- Demo channel with API keys
-- `.env.simulator` file with credentials
-
-### Step 3: Start NodeMCU Simulator
-```bash
-# Use credentials from .env.simulator
-CHANNEL_ID=xxx WRITE_API_KEY=yyy npm run nodemcu
-```
-Simulator starts sending sensor data every 10 seconds
-
-### Step 4: Start Mobile App
-```bash
-npm run phone
-# or
-npx expo start --tunnel
-```
-Scan QR code with Expo Go app on your phone
-
-### Step 5: Login & View Data
-1. Open app on phone
-2. Login with demo credentials (shown by setup script)
-3. Select channel
-4. View real-time air quality data!
-
----
 
 ## 📱 Mobile App User Flow (Fig 5)
 
