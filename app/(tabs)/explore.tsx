@@ -29,72 +29,96 @@ export default function TabTwoScreen() {
           style={{
             fontFamily: Fonts.rounded,
           }}>
-          Explore
+          About Air Quality
         </ThemedText>
       </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
+      <ThemedText>Learn about air quality monitoring and what the measurements mean for your health.</ThemedText>
+      
+      <Collapsible title="Air Quality Index (AQI)">
         <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
+          The AQI is calculated based on sensor readings from CO₂, temperature, and humidity levels.
         </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
+        <ThemedText style={{ marginTop: 8 }}>
+          <ThemedText type="defaultSemiBold">0-50 (Good):</ThemedText> Air quality is satisfactory. Safe for outdoor activities.
         </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">51-100 (Moderate):</ThemedText> Acceptable quality. Sensitive individuals should be cautious.
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">101-150 (Unhealthy for SG):</ThemedText> Sensitive groups may experience health effects.
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">151-200 (Unhealthy):</ThemedText> Everyone may begin to experience health effects.
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">201-300 (Very Unhealthy):</ThemedText> Health alert. Everyone may experience serious effects.
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">300+ (Hazardous):</ThemedText> Health warning. Emergency conditions.
+        </ThemedText>
       </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
+
+      <Collapsible title="CO₂ Levels">
         <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
+          Carbon dioxide (CO₂) concentration is measured in parts per million (ppm).
+        </ThemedText>
+        <ThemedText style={{ marginTop: 8 }}>
+          <ThemedText type="defaultSemiBold">400-600 ppm:</ThemedText> Excellent air quality (outdoor levels)
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">600-1000 ppm:</ThemedText> Acceptable indoor air quality
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">1000-1500 ppm:</ThemedText> Poor ventilation, drowsiness possible
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">1500+ ppm:</ThemedText> Stale air, health concerns
         </ThemedText>
       </Collapsible>
-      <Collapsible title="Images">
+
+      <Collapsible title="Temperature & Humidity">
         <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
+          Indoor comfort depends on both temperature and humidity levels.
         </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
+        <ThemedText style={{ marginTop: 8 }}>
+          <ThemedText type="defaultSemiBold">Optimal Temperature:</ThemedText> 20-26°C (68-79°F)
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          <ThemedText type="defaultSemiBold">Optimal Humidity:</ThemedText> 40-60%
+        </ThemedText>
+        <ThemedText style={{ marginTop: 8 }}>
+          Low humidity (&lt;40%) can cause dry skin and respiratory irritation. High humidity (&gt;60%) promotes mold growth and discomfort.
+        </ThemedText>
       </Collapsible>
-      <Collapsible title="Light and dark mode components">
+
+      <Collapsible title="How AQI is Calculated">
         <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
+          This IoT system calculates AQI by combining multiple sensor readings:
         </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
+        <ThemedText style={{ marginTop: 8 }}>
+          • <ThemedText type="defaultSemiBold">CO₂ levels</ThemedText> have the most significant impact on air quality
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          • <ThemedText type="defaultSemiBold">Temperature</ThemedText> affects comfort and air quality perception
+        </ThemedText>
+        <ThemedText style={{ marginTop: 4 }}>
+          • <ThemedText type="defaultSemiBold">Humidity</ThemedText> influences both comfort and air quality
+        </ThemedText>
+        <ThemedText style={{ marginTop: 8 }}>
+          The algorithm weights these factors to produce a single AQI value that represents overall environmental quality.
+        </ThemedText>
       </Collapsible>
-      <Collapsible title="Animations">
+
+      <Collapsible title="About This App">
         <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
+          This IoT-based air quality monitoring system provides real-time environmental data using sensor readings.
         </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
+        <ThemedText style={{ marginTop: 8 }}>
+          Built with React Native and Expo, the app displays live data from simulated IoT sensors with automatic updates every 15 seconds.
+        </ThemedText>
+        <ThemedText style={{ marginTop: 8 }}>
+          Features include interactive charts, color-coded status indicators, and historical trend analysis.
+        </ThemedText>
       </Collapsible>
     </ParallaxScrollView>
   );

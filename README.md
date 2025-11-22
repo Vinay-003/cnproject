@@ -1,15 +1,39 @@
-# Air Quality monitoring app
+# 🌬️ IoT-Based Air Quality Monitoring System
 
-A React Native application for monitoring and visualizing air quality and environmental data.
+A React Native application for real-time monitoring and visualization of air quality and environmental data from IoT sensors.
 
-## Overview
+## 🚀 **FRESH START** (Recommended)
+
+**Want to start completely fresh? Run this:**
+```bash
+cd /home/mylappy/Desktop/cnproject/project
+./scripts/fresh-start.sh
+```
+
+Or see **[FRESH_START.md](./FRESH_START.md)** for detailed manual steps.
+
+**Useful Commands:**
+- `./scripts/status.sh` - Check what's running
+- `./scripts/clean.sh` - Stop all processes & clean database
+- `./scripts/fresh-start.sh` - Complete fresh start with guide
+
+---
+
+## 📱 Overview
 
 This air quality monitor is a cross-platform mobile application built with React Native and Expo that provides real-time monitoring of air quality metrics. The app displays current readings and historical trends for:
 
-- Air Quality Index (AQI)
-- CO₂ levels (ppm)
-- Temperature (°C)
-- Humidity (%)
+- **Air Quality Index (AQI)** - Calculated from sensor readings
+- **CO₂ levels** (ppm) - Carbon dioxide concentration
+- **Temperature** (°C) - Ambient temperature
+- **Humidity** (%) - Relative humidity
+
+## ✨ What Makes This Special
+
+- **Scientific AQI Calculation**: Not just random numbers! AQI is calculated based on actual sensor readings using a weighted formula
+- **Realistic Sensor Simulation**: Gradual, natural changes that mimic real IoT sensor behavior
+- **Real-time Updates**: Auto-refreshes every 15 seconds
+- **Beautiful Visualizations**: Interactive charts, gauges, and color-coded status indicators
 
 ## Features
 
@@ -56,12 +80,41 @@ WeatherMonitor/
 3. The UI updates in real-time with new readings
 4. Historical data is stored and displayed as trend lines
 
-## Setup and Development
+## 🚀 Quick Start - Test on Your Phone
+
+### Prerequisites
+1. **On your phone**: Install **Expo Go** app from Play Store/App Store
+2. **Network**: Ensure phone and computer are on the **same WiFi network**
+
+### One-Command Start
+```bash
+npm run phone
+```
+
+This will:
+- ✅ Start the backend API server with realistic sensor simulation
+- ✅ Launch Expo with tunnel mode
+- ✅ Display a QR code to scan with Expo Go
+
+### Manual Start (Alternative)
+```bash
+# Terminal 1 - Start backend
+npm run start:api
+
+# Terminal 2 - Start Expo
+npx expo start --tunnel
+```
+
+Then scan the QR code with Expo Go on your phone!
+
+## 📖 Detailed Setup
 
 1. Clone the repository
-2. Install dependencies with `npm install`
-3. Start the development server with `npm start`
-4. Open on iOS, Android, or web using the Expo tools
+2. Install dependencies: `npm install`
+3. Start development: `npm run phone`
+4. Scan QR code with Expo Go app on your phone
+
+See [PHONE_TESTING.md](PHONE_TESTING.md) for detailed instructions.
 
 ## Environment Configuration
 

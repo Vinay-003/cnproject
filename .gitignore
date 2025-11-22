@@ -2,12 +2,15 @@
 
 # dependencies
 node_modules/
-
+.vscode
+.vscide/*
 # Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+
+backend/data.json
 
 # Native
 .kotlin/

@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, ScrollView, Pressable, Alert, useColorScheme } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import Svg, { Polyline, Circle } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { Colors } from '@/constants/theme';
+import * as Clipboard from 'expo-clipboard';
 
 // --- Types ---
 interface Reading {
@@ -133,25 +137,175 @@ const PathWrapper: React.FC<{ d: string; stroke: string; strokeWidth: number }> 
   <Path d={d} stroke={stroke} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" />
 );
 
+interface Channel {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  writeApiKey?: string;
+  readApiKey?: string;
+}
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+}
+
 export default function HomeScreen() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Check authentication on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const userStr = await AsyncStorage.getItem('user');
+      if (!userStr) {
+        router.replace('/login' as any);
+        return;
+      }
+      const userData = JSON.parse(userStr);
+      setUser(userData);
+      loadChannels(userData.id);
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      router.replace('/login' as any);
+    }
+  };
+
+  const loadChannels = async (userId: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/api/channels/user/${userId}`);
+      if (!response.ok) throw new Error('Failed to load channels');
+      
+      const data = await response.json() as { channels: Channel[] };
+      setChannels(data.channels);
+      
+      // Auto-select first channel if available
+      if (data.channels.length > 0 && !selectedChannel) {
+        setSelectedChannel(data.channels[0].id);
+      }
+    } catch (e: any) {
+      setError(e.message || 'Failed to load channels');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem('user');
+    router.replace('/login' as any);
+  };
+
+  const handleCreateChannel = () => {
+    router.push('/modal' as any);
+  };
+
+  const handleShowChannelInfo = (channelId: string) => {
+    const channel = channels.find(c => c.id === channelId);
+    if (!channel) return;
+
+    const copyBoth = async () => {
+      const text = `CHANNEL_ID=${channel.id}\nWRITE_API_KEY=${channel.writeApiKey}`;
+      await Clipboard.setStringAsync(text);
+      Alert.alert('✅ Copied!', 'Channel ID and Write API Key copied to clipboard.\n\nYou can now paste them in your terminal to start the NodeMCU simulator.');
+    };
+
+    const copyChannelId = async () => {
+      await Clipboard.setStringAsync(channel.id);
+      Alert.alert('✅ Copied!', 'Channel ID copied to clipboard');
+    };
+
+    const copyWriteKey = async () => {
+      await Clipboard.setStringAsync(channel.writeApiKey || '');
+      Alert.alert('✅ Copied!', 'Write API Key copied to clipboard');
+    };
+
+    Alert.alert(
+      `📡 ${channel.name}`,
+      `Channel ID:\n${channel.id}\n\nWrite API Key:\n${channel.writeApiKey}\n\nRead API Key:\n${channel.readApiKey}`,
+      [
+        { text: '📋 Copy Both', onPress: copyBoth },
+        { text: 'Copy Channel ID', onPress: copyChannelId },
+        { text: 'Copy Write Key', onPress: copyWriteKey },
+        { text: '✕ Close', style: 'cancel' }
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    if (!user) return;
+    
+    // Get channel name for confirmation
+    const channel = channels.find(c => c.id === channelId);
+    const channelName = channel?.name || 'this channel';
+    
+    Alert.alert(
+      'Delete Channel',
+      `Are you sure you want to delete "${channelName}"? All sensor data will be permanently lost.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_BASE}/api/channels/${channelId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id })
+              });
+
+              if (!response.ok) throw new Error('Failed to delete channel');
+
+              // Refresh channels
+              loadChannels(user.id);
+              
+              // Clear selection if deleted channel was selected
+              if (selectedChannel === channelId) {
+                setSelectedChannel(null);
+                setHistory([]);
+              }
+              
+              Alert.alert('Success', 'Channel deleted successfully');
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to delete channel: ' + error.message);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const latest = history[history.length - 1];
   const status = getAQIStatus(latest?.aqi);
 
   const fetchData = useCallback(async (opts: { showLoader?: boolean } = {}) => {
+    if (!selectedChannel) return;
     try {
       if (opts.showLoader) setLoading(true);
       setError(null);
-      const resp = await fetch(API_ENDPOINT);
+      const resp = await fetch(`${API_BASE}/api/channels/${selectedChannel}/readings?limit=${HISTORY_LIMIT}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data: Reading[] = await resp.json();
+      const data = await resp.json() as { readings: Reading[] };
       // Normalize order -> ascending by timestamp
-      const sorted = [...data].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const sorted = [...data.readings].sort((a: Reading, b: Reading) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       setHistory(sorted.slice(-HISTORY_LIMIT));
     } catch (e: any) {
       setError(e.message || 'Failed to load');
@@ -159,13 +313,15 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedChannel]);
 
   useEffect(() => {
-    fetchData({ showLoader: true });
-    timerRef.current = setInterval(() => fetchData(), POLL_INTERVAL_MS);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [fetchData]);
+    if (selectedChannel) {
+      fetchData({ showLoader: true });
+      timerRef.current = setInterval(() => fetchData(), POLL_INTERVAL_MS);
+      return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    }
+  }, [fetchData, selectedChannel]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -180,6 +336,20 @@ export default function HomeScreen() {
     labels: history.map(r => formatTime(r.timestamp)),
   }), [history]);
 
+  const colorScheme = useColorScheme();
+  const themeColors = Colors[colorScheme ?? 'light'];
+  const isDark = colorScheme === 'dark';
+
+  // Show login screen if not authenticated
+  if (!user) {
+    return (
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+        <ThemedText style={{ marginTop: 16 }}>Checking authentication...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: status.color + '20', dark: status.color + '40' }}
@@ -190,6 +360,102 @@ export default function HomeScreen() {
         </View>
       }
     >
+      {/* User Info & Channel Selection */}
+      <ThemedView style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <ThemedText type="subtitle">Welcome, {user.username || user.email?.split('@')[0] || 'User'}!</ThemedText>
+          <Pressable 
+            onPress={handleLogout} 
+            style={[
+              styles.logoutButton,
+              { backgroundColor: isDark ? '#4a1a1a' : '#ffe5e5' }
+            ]}
+          >
+            <ThemedText style={{ fontSize: 12, color: '#e74c3c' }}>Logout</ThemedText>
+          </Pressable>
+        </View>
+
+        <View style={styles.sectionHeaderRow}>
+          <ThemedText type="defaultSemiBold" style={{ fontSize: 16 }}>My Channels</ThemedText>
+          <Pressable 
+            onPress={() => user && loadChannels(user.id)} 
+            style={[
+              styles.refreshButton,
+              { backgroundColor: isDark ? '#333' : '#ddd' }
+            ]}
+          >
+            <ThemedText style={{ fontSize: 12 }}>🔄 Refresh</ThemedText>
+          </Pressable>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.channelScrollView}>
+          {channels.map((channel) => (
+            <View key={channel.id} style={styles.channelCardWrapper}>
+              <View
+                style={[
+                  styles.channelCard,
+                  { 
+                    backgroundColor: themeColors.background,
+                    borderColor: selectedChannel === channel.id ? '#007AFF' : (colorScheme === 'dark' ? '#444' : '#ddd')
+                  },
+                  selectedChannel === channel.id && styles.channelCardSelected
+                ]}
+              >
+                <View style={styles.channelCardHeader}>
+                  <Pressable 
+                    onPress={() => setSelectedChannel(channel.id)}
+                    style={{ flex: 1 }}
+                  >
+                    <ThemedText 
+                      style={[
+                        styles.channelName, 
+                        selectedChannel === channel.id && styles.channelNameSelected
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {channel.name}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable 
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleShowChannelInfo(channel.id);
+                    }}
+                    style={styles.menuButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <ThemedText style={{ fontSize: 20, fontWeight: 'bold', lineHeight: 20 }}>⋮</ThemedText>
+                  </Pressable>
+                </View>
+                <Pressable onPress={() => setSelectedChannel(channel.id)}>
+                  <ThemedText style={styles.channelDesc} numberOfLines={2}>
+                    {channel.description || 'No description'}
+                  </ThemedText>
+                  <ThemedText style={styles.channelId}>
+                    ID: {channel.id.substring(0, 20)}...
+                  </ThemedText>
+                </Pressable>
+              </View>
+              <Pressable 
+                onPress={() => handleDeleteChannel(channel.id)} 
+                style={styles.deleteButton}
+              >
+                <ThemedText style={styles.deleteButtonText}>🗑️ Delete</ThemedText>
+              </Pressable>
+            </View>
+          ))}
+          <Pressable 
+            onPress={handleCreateChannel} 
+            style={[
+              styles.addChannelCard,
+              { backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f9f9f9' }
+            ]}
+          >
+            <ThemedText style={styles.addChannelIcon}>+</ThemedText>
+            <ThemedText style={styles.addChannelText}>Add Channel</ThemedText>
+          </Pressable>
+        </ScrollView>
+      </ThemedView>
+
       <ThemedView style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <ThemedText type="title">Live Air Quality</ThemedText>
@@ -247,6 +513,11 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   headerStatusContainer: {
     flex: 1,
     width: '100%',
@@ -257,7 +528,97 @@ const styles = StyleSheet.create({
   headerSubText: { fontSize: 12 },
   section: { marginBottom: 24, gap: 12 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  refreshButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#ddd' },
+  logoutButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  refreshButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  channelScrollView: {
+    marginBottom: 12,
+  },
+  channelCardWrapper: {
+    marginRight: 12,
+  },
+  channelCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    width: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  channelCardSelected: {
+    borderWidth: 3,
+  },
+  channelCardHeader: {
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  channelName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  menuButton: {
+    padding: 6,
+    marginLeft: 8,
+    minWidth: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+  },
+  channelNameSelected: {
+    color: '#007AFF',
+  },
+  channelDesc: {
+    fontSize: 13,
+    opacity: 0.7,
+    marginTop: 4,
+    marginBottom: 6,
+    lineHeight: 18,
+  },
+  channelId: {
+    fontSize: 10,
+    opacity: 0.5,
+    fontFamily: 'monospace',
+  },
+  deleteButton: {
+    marginTop: 8,
+    backgroundColor: '#ff4444',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addChannelCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderStyle: 'dashed',
+    width: 200,
+    height: 140,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addChannelIcon: {
+    fontSize: 40,
+    color: '#007AFF',
+    marginBottom: 8,
+  },
+  addChannelText: {
+    color: '#007AFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   centerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
   errorBox: { backgroundColor: '#c0392b', padding: 12, borderRadius: 8, gap: 8 },
   retryBtn: { alignSelf: 'flex-start', backgroundColor: '#922b21', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 },
