@@ -1,0 +1,117 @@
+╔════════════════════════════════════════════════════════════════╗
+║   MQTT Broker - IoT Air Quality Monitoring System             ║
+║   Powered by Aedes                                             ║
+╚════════════════════════════════════════════════════════════════╝
+
+🌐 MQTT Broker running on:
+   TCP: mqtt://0.0.0.0:1883
+   Mobile: mqtt://192.168.1.12:1883
+
+📋 Supported Features:
+   - MQTT v3.1.1 and v5.0
+   - QoS 0, 1, 2
+   - Retained messages
+   - Wildcard subscriptions
+
+📡 Topic Structure:
+   Publish: sensors/<channelId>/readings
+   Subscribe: sensors/# (all channels)
+   Subscribe: sensors/<channelId>/# (specific channel)
+
+✅ Broker ready! Waiting for MQTT clients...
+
+🔌 MQTT over WebSocket running on: ws://0.0.0.0:8883
+
+🔐 Client backend_subscriber_1763834335757 authenticating...
+✅ [MQTT] Client connected: backend_subscriber_1763834335757 (Total: 1)
+📡 [MQTT] Client backend_subscriber_1763834335757 subscribed to: sensors/# (QoS 1)
+🔐 Client nodemcu_channel_1763832869865_c82112f0_1763834510865 authenticating...
+✅ [MQTT] Client connected: nodemcu_channel_1763832869865_c82112f0_1763834510865 (Total: 2)
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 179 | Size: 162 bytes
+🔐 Client nodemcu_channel_1763822063022_85af370e_1763834515336 authenticating...
+✅ [MQTT] Client connected: nodemcu_channel_1763822063022_85af370e_1763834515336 (Total: 3)
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 180 | Size: 159 bytes
+🔐 Client nodemcu_channel_1763822023638_5adc2b8c_1763834519014 authenticating...
+✅ [MQTT] Client connected: nodemcu_channel_1763822023638_5adc2b8c_1763834519014 (Total: 4)
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 169 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 175 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 182 | Size: 161 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 175 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 171 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 182 | Size: 160 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 176 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 170 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 188 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 173 | Size: 161 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 165 | Size: 160 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 195 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 169 | Size: 161 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 163 | Size: 159 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 196 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 169 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 167 | Size: 160 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 202 | Size: 163 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 176 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 169 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 204 | Size: 163 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 180 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 168 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763822063022_85af370e/readings (QoS 1)
+   From: nodemcu_channel_1763822063022_85af370e_1763834515336
+   AQI: 206 | Size: 163 bytes
+📨 [MQTT] Published to sensors/channel_1763822023638_5adc2b8c/readings (QoS 1)
+   From: nodemcu_channel_1763822023638_5adc2b8c_1763834519014
+   AQI: 183 | Size: 162 bytes
+📨 [MQTT] Published to sensors/channel_1763832869865_c82112f0/readings (QoS 1)
+   From: nodemcu_channel_1763832869865_c82112f0_1763834510865
+   AQI: 170 | Size: 160 bytes

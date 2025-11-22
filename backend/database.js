@@ -108,12 +108,28 @@ const users = {
 
 // Channel Management
 const channels = {
-  create: (userId, name, description = '') => {
+  create: (userId, name, description = '', isPublic = false, location = null) => {
+    // Sanitize location data for public channels - remove exact coordinates
+    let sanitizedLocation = null;
+    if (location && isPublic) {
+      // Round coordinates to 3 decimal places (~100m accuracy) for privacy
+      // This prevents exact address tracking while keeping general area
+      sanitizedLocation = {
+        latitude: Math.round(location.latitude * 1000) / 1000,
+        longitude: Math.round(location.longitude * 1000) / 1000,
+        generalLocation: location.generalLocation
+      };
+    } else if (location) {
+      sanitizedLocation = location;
+    }
+
     const channel = {
       id: generateId('channel'),
       userId,
       name,
       description,
+      isPublic: isPublic || false,
+      location: sanitizedLocation, // { latitude, longitude, generalLocation }
       readApiKey: generateApiKey(),
       writeApiKey: generateApiKey(),
       createdAt: new Date().toISOString(),
@@ -136,6 +152,27 @@ const channels = {
 
   findByUser: (userId) => {
     return db.channels.filter(c => c.userId === userId);
+  },
+
+  findPublic: () => {
+    // Return public channels with anonymized data (no userId, no API keys exposed)
+    return db.channels
+      .filter(c => c.isPublic === true)
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        // Location is already sanitized (rounded coordinates + area/neighborhood only)
+        location: c.location ? {
+          latitude: c.location.latitude,
+          longitude: c.location.longitude,
+          generalLocation: c.location.generalLocation
+        } : null,
+        createdAt: c.createdAt,
+        fields: c.fields
+        // Security: userId, readApiKey, writeApiKey are intentionally omitted
+        // This ensures complete anonymity - no way to trace channel to user
+      }));
   },
 
   findByApiKey: (apiKey) => {
@@ -174,6 +211,8 @@ const readings = {
       timestamp: new Date().toISOString(),
       aqi: data.aqi,
       co2: data.co2,
+      co: data.co || 0,
+      no2: data.no2 || 0,
       temperature: data.temperature,
       humidity: data.humidity
     };
@@ -197,6 +236,22 @@ const readings = {
       .filter(r => r.channelId === channelId)
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, limit);
+  },
+
+  findByTimeRange: (channelId, startTime, endTime) => {
+    let channelReadings = db.readings.filter(r => r.channelId === channelId);
+    
+    if (startTime) {
+      const start = new Date(startTime);
+      channelReadings = channelReadings.filter(r => new Date(r.timestamp) >= start);
+    }
+    
+    if (endTime) {
+      const end = new Date(endTime);
+      channelReadings = channelReadings.filter(r => new Date(r.timestamp) <= end);
+    }
+    
+    return channelReadings.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   },
 
   getLatest: (channelId) => {

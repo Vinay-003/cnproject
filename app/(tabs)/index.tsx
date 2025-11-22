@@ -1,19 +1,24 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, ActivityIndicator, ScrollView, Pressable, Alert, useColorScheme } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
-import Svg, { Polyline, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import * as Clipboard from 'expo-clipboard';
+import HistoricalDataAnalysis from '@/components/historical-data-analysis';
+import { calculatePollutantAQI, getAQIStatus as getDetailedAQIStatus } from '@/utils/aqiCalculator';
+import { useWebSocket } from '@/hooks/use-websocket';
 
 // --- Types ---
 interface Reading {
   timestamp: string; // ISO
   aqi: number; // Air Quality Index
   co2: number; // ppm
+  co: number; // ppm
+  no2: number; // ppm
   temperature: number; // °C
   humidity: number; // %
 }
@@ -35,11 +40,6 @@ function getAQIStatus(aqi?: number) {
   return { label: 'Hazardous', color: '#7f0000' };
 }
 
-function formatTime(ts: string) {
-  const d = new Date(ts);
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-}
-
 const MetricCard: React.FC<{ title: string; value?: number; unit: string; color?: string; subtitle?: string }>
   = ({ title, value, unit, color, subtitle }) => {
   return (
@@ -50,46 +50,6 @@ const MetricCard: React.FC<{ title: string; value?: number; unit: string; color?
       </ThemedText>
       {!!subtitle && <ThemedText style={{ color, fontSize: 12 }}>{subtitle}</ThemedText>}
     </ThemedView>
-  );
-};
-
-interface MiniLineChartProps {
-  data: number[];
-  width?: number;
-  height?: number;
-  color?: string;
-  strokeWidth?: number;
-  backgroundColor?: string;
-  min?: number;
-  max?: number;
-}
-const MiniLineChart: React.FC<MiniLineChartProps> = ({
-  data,
-  width = 140,
-  height = 60,
-  color = '#2ecc71',
-  strokeWidth = 2,
-  backgroundColor = 'transparent',
-  min,
-  max,
-}) => {
-  if (!data.length) return <View style={{ width, height, justifyContent: 'center', alignItems: 'center' }}><ThemedText style={{ fontSize: 10 }}>No data</ThemedText></View>;
-  const localMin = min ?? Math.min(...data);
-  const localMax = max ?? Math.max(...data);
-  const range = localMax - localMin || 1;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * (width - 10) + 5; // padding
-    const y = height - ((v - localMin) / range) * (height - 10) - 5;
-    return `${x},${y}`;
-  }).join(' ');
-  const latest = data[data.length - 1];
-  const latestX = (width - 10) + 5;
-  const latestY = height - ((latest - localMin) / range) * (height - 10) - 5;
-  return (
-    <Svg width={width} height={height} style={{ backgroundColor }}>
-      <Polyline points={points} fill="none" stroke={color} strokeWidth={strokeWidth} />
-      <Circle cx={latestX} cy={latestY} r={4} fill={color} />
-    </Svg>
   );
 };
 
@@ -132,7 +92,6 @@ function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
 }
 
-import { Path } from 'react-native-svg';
 const PathWrapper: React.FC<{ d: string; stroke: string; strokeWidth: number }> = ({ d, stroke, strokeWidth }) => (
   <Path d={d} stroke={stroke} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" />
 );
@@ -161,7 +120,29 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [simulatorStatus, setSimulatorStatus] = useState<Record<string, boolean>>({});
+  const [useWebSocketMode, setUseWebSocketMode] = useState(true); // Toggle between WebSocket and polling
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // WebSocket for real-time updates
+  const { isConnected: wsConnected, latestReading: wsReading, metrics: wsMetrics } = useWebSocket(
+    selectedChannel,
+    {
+      enabled: useWebSocketMode && !!selectedChannel,
+      onNewReading: (reading) => {
+        console.log('📥 [Home] Received real-time reading:', reading);
+        // Add to history
+        setHistory(prev => {
+          const updated = [...prev, reading];
+          // Keep only last HISTORY_LIMIT items
+          return updated.slice(-HISTORY_LIMIT);
+        });
+      },
+      onError: (error) => {
+        console.error('❌ [Home] WebSocket error:', error);
+      }
+    }
+  );
 
   // Check authentication on mount
   useEffect(() => {
@@ -197,10 +178,140 @@ export default function HomeScreen() {
       if (data.channels.length > 0 && !selectedChannel) {
         setSelectedChannel(data.channels[0].id);
       }
+
+      // Check simulator status for all channels
+      checkAllSimulatorStatus(data.channels);
     } catch (e: any) {
       setError(e.message || 'Failed to load channels');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkAllSimulatorStatus = async (channelList: Channel[]) => {
+    const statusMap: Record<string, boolean> = {};
+    
+    await Promise.all(
+      channelList.map(async (channel) => {
+        try {
+          const response = await fetch(`${API_BASE}/api/simulator/status/${channel.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            statusMap[channel.id] = data.running || false;
+          }
+        } catch (error) {
+          console.error('Failed to check simulator status:', error);
+        }
+      })
+    );
+
+    setSimulatorStatus(statusMap);
+  };
+
+  const startSimulator = async (
+    channelId: string, 
+    writeApiKey: string, 
+    transport: 'http' | 'mqtt' = 'http',
+    mqttQos: 0 | 1 | 2 = 1
+  ) => {
+    try {
+      const serverUrl = API_BASE.replace('localhost', '192.168.1.12');
+      const mqttBrokerUrl = 'mqtt://192.168.1.12:1883';
+      
+      const response = await fetch(`${API_BASE}/api/simulator/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId,
+          writeApiKey,
+          serverUrl,
+          useMqtt: transport === 'mqtt',
+          mqttBrokerUrl: transport === 'mqtt' ? mqttBrokerUrl : undefined,
+          mqttQos: transport === 'mqtt' ? mqttQos : undefined,
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSimulatorStatus(prev => ({ ...prev, [channelId]: true }));
+        const mode = transport === 'mqtt' ? `MQTT (QoS ${mqttQos})` : 'HTTP';
+        Alert.alert(
+          '✅ Simulator Started!', 
+          `Simulator is now running in ${mode} mode.\n\nPID: ${data.pid}\nTransport: ${mode}`
+        );
+      } else {
+        if (data.status === 'already_running') {
+          Alert.alert('ℹ️ Already Running', 'Simulator is already running for this channel.');
+        } else {
+          Alert.alert('❌ Failed to Start', data.error || 'Could not start simulator');
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('❌ Error', 'Failed to start simulator: ' + error.message);
+    }
+  };
+
+  const stopSimulator = async (channelId: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/simulator/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSimulatorStatus(prev => ({ ...prev, [channelId]: false }));
+        Alert.alert('✅ Simulator Stopped', 'Simulator has been stopped for this channel.');
+      } else {
+        Alert.alert('❌ Failed to Stop', data.error || 'Could not stop simulator');
+      }
+    } catch (error: any) {
+      Alert.alert('❌ Error', 'Failed to stop simulator: ' + error.message);
+    }
+  };
+
+  const handleToggleSimulator = async (channel: Channel) => {
+    const isRunning = simulatorStatus[channel.id];
+    
+    if (isRunning) {
+      // Stop simulator
+      Alert.alert(
+        'Stop Simulator?',
+        `Stop the simulator for "${channel.name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Stop', style: 'destructive', onPress: () => stopSimulator(channel.id) }
+        ]
+      );
+    } else {
+      // Start simulator - Ask for transport mode
+      Alert.alert(
+        'Start Simulator',
+        `Choose transport protocol for "${channel.name}":`,
+        [
+          { 
+            text: 'HTTP (Original)', 
+            onPress: () => startSimulator(channel.id, channel.writeApiKey || '', 'http')
+          },
+          { 
+            text: 'MQTT QoS 0', 
+            onPress: () => startSimulator(channel.id, channel.writeApiKey || '', 'mqtt', 0)
+          },
+          { 
+            text: 'MQTT QoS 1 ⭐', 
+            onPress: () => startSimulator(channel.id, channel.writeApiKey || '', 'mqtt', 1)
+          },
+          { 
+            text: 'MQTT QoS 2', 
+            onPress: () => startSimulator(channel.id, channel.writeApiKey || '', 'mqtt', 2)
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ],
+        { cancelable: true }
+      );
     }
   };
 
@@ -233,13 +344,122 @@ export default function HomeScreen() {
       Alert.alert('✅ Copied!', 'Write API Key copied to clipboard');
     };
 
+    const copySimulatorCommand = async (mode: 'http' | 'mqtt' = 'http', qos: 0 | 1 | 2 = 1) => {
+      const serverUrl = API_BASE.replace('localhost', '192.168.1.12');
+      const mqttBrokerUrl = 'mqtt://192.168.1.12:1883';
+      
+      let command = `CHANNEL_ID=${channel.id} WRITE_API_KEY=${channel.writeApiKey} SERVER_URL=${serverUrl}`;
+      
+      if (mode === 'mqtt') {
+        command += ` USE_MQTT=true MQTT_BROKER_URL=${mqttBrokerUrl} MQTT_QOS=${qos}`;
+      }
+      
+      command += ` node simulator/nodemcu.js`;
+      
+      await Clipboard.setStringAsync(command);
+      Alert.alert(
+        '✅ Command Copied!', 
+        `${mode === 'mqtt' ? `MQTT (QoS ${qos})` : 'HTTP'} simulator command copied!\n\nPaste in terminal to start.`,
+        [{ text: 'OK' }]
+      );
+    };
+
+    const showSimulatorInstructions = () => {
+      const serverUrl = API_BASE.replace('localhost', '192.168.1.12');
+      const mqttBrokerUrl = 'mqtt://192.168.1.12:1883';
+      
+      Alert.alert(
+        '� Choose Command Type',
+        'Select the transport protocol:',
+        [
+          {
+            text: 'HTTP (Original)',
+            onPress: () => Alert.alert(
+              '�🔧 HTTP Simulator Command',
+              `CHANNEL_ID=${channel.id}\n` +
+              `WRITE_API_KEY=${channel.writeApiKey}\n` +
+              `SERVER_URL=${serverUrl}\n` +
+              `node simulator/nodemcu.js`,
+              [
+                { text: 'Copy', onPress: () => copySimulatorCommand('http') },
+                { text: 'Close' }
+              ]
+            )
+          },
+          {
+            text: 'MQTT QoS 0',
+            onPress: () => Alert.alert(
+              '🔧 MQTT QoS 0 Simulator Command',
+              `USE_MQTT=true\n` +
+              `MQTT_QOS=0\n` +
+              `MQTT_BROKER_URL=${mqttBrokerUrl}\n` +
+              `CHANNEL_ID=${channel.id}\n` +
+              `WRITE_API_KEY=${channel.writeApiKey}\n` +
+              `node simulator/nodemcu.js`,
+              [
+                { text: 'Copy', onPress: () => copySimulatorCommand('mqtt', 0) },
+                { text: 'Close' }
+              ]
+            )
+          },
+          {
+            text: 'MQTT QoS 1 ⭐',
+            onPress: () => Alert.alert(
+              '🔧 MQTT QoS 1 Simulator Command',
+              `USE_MQTT=true\n` +
+              `MQTT_QOS=1\n` +
+              `MQTT_BROKER_URL=${mqttBrokerUrl}\n` +
+              `CHANNEL_ID=${channel.id}\n` +
+              `WRITE_API_KEY=${channel.writeApiKey}\n` +
+              `node simulator/nodemcu.js`,
+              [
+                { text: 'Copy', onPress: () => copySimulatorCommand('mqtt', 1) },
+                { text: 'Close' }
+              ]
+            )
+          },
+          {
+            text: 'MQTT QoS 2',
+            onPress: () => Alert.alert(
+              '🔧 MQTT QoS 2 Simulator Command',
+              `USE_MQTT=true\n` +
+              `MQTT_QOS=2\n` +
+              `MQTT_BROKER_URL=${mqttBrokerUrl}\n` +
+              `CHANNEL_ID=${channel.id}\n` +
+              `WRITE_API_KEY=${channel.writeApiKey}\n` +
+              `node simulator/nodemcu.js`,
+              [
+                { text: 'Copy', onPress: () => copySimulatorCommand('mqtt', 2) },
+                { text: 'Close' }
+              ]
+            )
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    };
+
+    const isRunning = simulatorStatus[channelId];
+    
+    const handleStartStop = () => {
+      if (isRunning) {
+        stopSimulator(channelId);
+      } else {
+        startSimulator(channelId, channel.writeApiKey || '');
+      }
+    };
+
     Alert.alert(
       `📡 ${channel.name}`,
-      `Channel ID:\n${channel.id}\n\nWrite API Key:\n${channel.writeApiKey}\n\nRead API Key:\n${channel.readApiKey}`,
+      `Channel ID:\n${channel.id}\n\nWrite API Key:\n${channel.writeApiKey}\n\nRead API Key:\n${channel.readApiKey}\n\nSimulator: ${isRunning ? '🟢 Running' : '🔴 Stopped'}`,
       [
-        { text: '📋 Copy Both', onPress: copyBoth },
-        { text: 'Copy Channel ID', onPress: copyChannelId },
-        { text: 'Copy Write Key', onPress: copyWriteKey },
+        { 
+          text: isRunning ? '⏸️ Stop Simulator' : '▶️ Start Simulator', 
+          onPress: handleStartStop 
+        },
+        { text: '🚀 Copy Commands', onPress: showSimulatorInstructions },
+        { text: '📋 Copy Channel ID', onPress: copyChannelId },
+        { text: '📋 Copy Write Key', onPress: copyWriteKey },
         { text: '✕ Close', style: 'cancel' }
       ],
       { cancelable: true }
@@ -266,6 +486,20 @@ export default function HomeScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Stop simulator if running before deleting channel
+              if (simulatorStatus[channelId]) {
+                try {
+                  await fetch(`${API_BASE}/api/simulator/stop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channelId })
+                  });
+                  setSimulatorStatus(prev => ({ ...prev, [channelId]: false }));
+                } catch (simError) {
+                  console.warn('Failed to stop simulator, but continuing with delete:', simError);
+                }
+              }
+
               const response = await fetch(`${API_BASE}/api/channels/${channelId}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
@@ -283,7 +517,7 @@ export default function HomeScreen() {
                 setHistory([]);
               }
               
-              Alert.alert('Success', 'Channel deleted successfully');
+              Alert.alert('Success', 'Channel and simulator stopped (if running) successfully');
             } catch (error: any) {
               Alert.alert('Error', 'Failed to delete channel: ' + error.message);
             }
@@ -315,26 +549,26 @@ export default function HomeScreen() {
     }
   }, [selectedChannel]);
 
+  // Polling mode (only when WebSocket is disabled)
   useEffect(() => {
-    if (selectedChannel) {
+    if (selectedChannel && !useWebSocketMode) {
       fetchData({ showLoader: true });
       timerRef.current = setInterval(() => fetchData(), POLL_INTERVAL_MS);
       return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    } else if (selectedChannel && useWebSocketMode) {
+      // Initial load when switching to WebSocket mode
+      fetchData({ showLoader: true });
     }
-  }, [fetchData, selectedChannel]);
+  }, [fetchData, selectedChannel, useWebSocketMode]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    // Refresh all data: channels, readings, and simulator status
+    if (user) {
+      loadChannels(user.id);
+    }
     fetchData();
-  }, [fetchData]);
-
-  const series = useMemo(() => ({
-    aqi: history.map(r => r.aqi),
-    co2: history.map(r => r.co2),
-    temp: history.map(r => r.temperature),
-    hum: history.map(r => r.humidity),
-    labels: history.map(r => formatTime(r.timestamp)),
-  }), [history]);
+  }, [fetchData, user, loadChannels]);
 
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme ?? 'light'];
@@ -359,6 +593,8 @@ export default function HomeScreen() {
           <ThemedText style={styles.headerSubText}>{latest ? new Date(latest.timestamp).toLocaleTimeString() : '—'}</ThemedText>
         </View>
       }
+      refreshing={refreshing}
+      onRefresh={onRefresh}
     >
       {/* User Info & Channel Selection */}
       <ThemedView style={styles.section}>
@@ -405,15 +641,23 @@ export default function HomeScreen() {
                     onPress={() => setSelectedChannel(channel.id)}
                     style={{ flex: 1 }}
                   >
-                    <ThemedText 
-                      style={[
-                        styles.channelName, 
-                        selectedChannel === channel.id && styles.channelNameSelected
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {channel.name}
-                    </ThemedText>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <ThemedText 
+                        style={[
+                          styles.channelName, 
+                          selectedChannel === channel.id && styles.channelNameSelected
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {channel.name}
+                      </ThemedText>
+                      <View 
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: simulatorStatus[channel.id] ? '#28a745' : '#999' }
+                        ]} 
+                      />
+                    </View>
                   </Pressable>
                   <Pressable 
                     onPress={(e) => {
@@ -435,12 +679,32 @@ export default function HomeScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-              <Pressable 
-                onPress={() => handleDeleteChannel(channel.id)} 
-                style={styles.deleteButton}
-              >
-                <ThemedText style={styles.deleteButtonText}>🗑️ Delete</ThemedText>
-              </Pressable>
+              <View style={styles.channelActions}>
+                <Pressable 
+                  onPress={() => handleToggleSimulator(channel)} 
+                  style={[
+                    styles.simulatorButton, 
+                    simulatorStatus[channel.id] 
+                      ? { backgroundColor: isDark ? '#4a1a1a' : '#ffe5e5', borderColor: '#e74c3c' }
+                      : { backgroundColor: isDark ? '#1a3a1a' : '#e6f7e6', borderColor: '#28a745' }
+                  ]}
+                >
+                  <ThemedText 
+                    style={[
+                      styles.simulatorButtonText,
+                      { color: simulatorStatus[channel.id] ? '#e74c3c' : '#28a745' }
+                    ]}
+                  >
+                    {simulatorStatus[channel.id] ? '⏸️ Stop' : '▶️ Start'}
+                  </ThemedText>
+                </Pressable>
+                <Pressable 
+                  onPress={() => handleDeleteChannel(channel.id)} 
+                  style={styles.deleteButton}
+                >
+                  <ThemedText style={styles.deleteButtonText}>🗑️ Delete</ThemedText>
+                </Pressable>
+              </View>
             </View>
           ))}
           <Pressable 
@@ -454,6 +718,31 @@ export default function HomeScreen() {
             <ThemedText style={styles.addChannelText}>Add Channel</ThemedText>
           </Pressable>
         </ScrollView>
+      </ThemedView>
+
+      {/* WebSocket Connection Status */}
+      <ThemedView style={styles.section}>
+        <View style={[styles.wsStatusContainer, { backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[styles.statusDot, { backgroundColor: wsConnected ? '#28a745' : '#dc3545', width: 10, height: 10 }]} />
+            <ThemedText style={{ fontSize: 13 }}>
+              {useWebSocketMode ? (wsConnected ? 'WebSocket Connected' : 'WebSocket Disconnected') : 'HTTP Polling Mode'}
+            </ThemedText>
+          </View>
+          <Pressable 
+            onPress={() => setUseWebSocketMode(prev => !prev)}
+            style={[styles.modeToggleButton, { backgroundColor: isDark ? '#444' : '#ddd' }]}
+          >
+            <ThemedText style={{ fontSize: 11 }}>{useWebSocketMode ? '📡 Switch to HTTP' : '🔌 Switch to WS'}</ThemedText>
+          </Pressable>
+        </View>
+        {useWebSocketMode && wsConnected && (
+          <View style={[styles.wsMetricsBox, { backgroundColor: isDark ? '#1a1a1a' : '#e8f5e9' }]}>
+            <ThemedText style={{ fontSize: 11, opacity: 0.8 }}>
+              📊 Latency: {wsMetrics.latency}ms | Messages: {wsMetrics.messagesReceived} | Data: {(wsMetrics.bytesReceived / 1024).toFixed(2)}KB
+            </ThemedText>
+          </View>
+        )}
       </ThemedView>
 
       <ThemedView style={styles.section}>
@@ -473,12 +762,69 @@ export default function HomeScreen() {
           </View>
         )}
         {!!latest && (
-          <View style={styles.cardsRow}>
-            <MetricCard title="AQI" value={latest.aqi} unit="" color={status.color} subtitle={status.label} />
-            <MetricCard title="CO₂" value={latest.co2} unit="ppm" color="#e74c3c" />
-            <MetricCard title="Temp" value={latest.temperature} unit="°C" color="#3498db" />
-            <MetricCard title="Humidity" value={latest.humidity} unit="%" color="#9b59b6" />
-          </View>
+          <>
+            <View style={styles.cardsRow}>
+              <MetricCard title="AQI" value={latest.aqi} unit="" color={status.color} subtitle={status.label} />
+              <MetricCard title="CO₂" value={latest.co2} unit="ppm" color="#e74c3c" />
+              <MetricCard title="CO" value={latest.co} unit="ppm" color="#ff6b6b" />
+              <MetricCard title="NO₂" value={latest.no2} unit="ppm" color="#f39c12" />
+              <MetricCard title="Temp" value={latest.temperature} unit="°C" color="#3498db" />
+              <MetricCard title="Humidity" value={latest.humidity} unit="%" color="#9b59b6" />
+            </View>
+
+            {/* Pollutant Sub-Indices */}
+            {latest.co != null && latest.co2 != null && latest.no2 != null && (
+              <View style={styles.subIndicesContainer}>
+                <ThemedText type="defaultSemiBold" style={{ marginBottom: 8 }}>Pollutant Sub-Indices</ThemedText>
+                <View style={styles.subIndicesRow}>
+                  {(() => {
+                    const aqiData = calculatePollutantAQI(latest.co, latest.co2, latest.no2);
+                    const coStatus = getDetailedAQIStatus(aqiData.coAQI);
+                    const co2Status = getDetailedAQIStatus(aqiData.co2AQI);
+                    const no2Status = getDetailedAQIStatus(aqiData.no2AQI);
+                    
+                    return (
+                      <>
+                        <View style={[styles.subIndexCard, { borderColor: coStatus.color }]}>
+                          <ThemedText style={{ fontSize: 12, opacity: 0.7 }}>CO AQI</ThemedText>
+                          <ThemedText type="title" style={{ color: coStatus.color }}>
+                            {aqiData.coAQI.toFixed(0)}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 10, color: coStatus.color }}>
+                            {coStatus.label}
+                            {aqiData.dominant === 'CO' && ' 🔴'}
+                          </ThemedText>
+                        </View>
+                        <View style={[styles.subIndexCard, { borderColor: co2Status.color }]}>
+                          <ThemedText style={{ fontSize: 12, opacity: 0.7 }}>CO₂ AQI</ThemedText>
+                          <ThemedText type="title" style={{ color: co2Status.color }}>
+                            {aqiData.co2AQI.toFixed(0)}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 10, color: co2Status.color }}>
+                            {co2Status.label}
+                            {aqiData.dominant === 'CO2' && ' 🔴'}
+                          </ThemedText>
+                        </View>
+                        <View style={[styles.subIndexCard, { borderColor: no2Status.color }]}>
+                          <ThemedText style={{ fontSize: 12, opacity: 0.7 }}>NO₂ AQI</ThemedText>
+                          <ThemedText type="title" style={{ color: no2Status.color }}>
+                            {aqiData.no2AQI.toFixed(0)}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 10, color: no2Status.color }}>
+                            {no2Status.label}
+                            {aqiData.dominant === 'NO2' && ' 🔴'}
+                          </ThemedText>
+                        </View>
+                      </>
+                    );
+                  })()}
+                </View>
+                <ThemedText style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+                  🔴 indicates dominant pollutant
+                </ThemedText>
+              </View>
+            )}
+          </>
         )}
       </ThemedView>
 
@@ -487,27 +833,20 @@ export default function HomeScreen() {
         <Gauge value={latest?.aqi} color={status.color} />
       </ThemedView>
 
-      <ThemedView style={styles.section}>
-        <ThemedText type="subtitle" style={{ marginBottom: 8 }}>Trends</ThemedText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-          <View style={styles.chartCard}>
-            <ThemedText style={styles.chartTitle}>AQI</ThemedText>
-            <MiniLineChart data={series.aqi} color={status.color} />
-          </View>
-          <View style={styles.chartCard}>
-            <ThemedText style={styles.chartTitle}>CO₂ (ppm)</ThemedText>
-            <MiniLineChart data={series.co2} color="#e74c3c" />
-          </View>
-          <View style={styles.chartCard}>
-            <ThemedText style={styles.chartTitle}>Temp (°C)</ThemedText>
-            <MiniLineChart data={series.temp} color="#3498db" />
-          </View>
-          <View style={styles.chartCard}>
-            <ThemedText style={styles.chartTitle}>Humidity (%)</ThemedText>
-            <MiniLineChart data={series.hum} color="#9b59b6" />
-          </View>
-        </ScrollView>
-      </ThemedView>
+      {/* Historical Data Analysis - Replaces old Trends section with comprehensive time-based analysis */}
+      {selectedChannel && (
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={{ marginBottom: 8 }}>Historical Data Analysis</ThemedText>
+          <ThemedText style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
+            View detailed historical data with hour/day/week/month filters
+          </ThemedText>
+          <HistoricalDataAnalysis
+            channelId={selectedChannel}
+            apiKey={channels.find(c => c.id === selectedChannel)?.readApiKey || ''}
+            isDark={isDark}
+          />
+        </ThemedView>
+      )}
     </ParallaxScrollView>
   );
 }
@@ -560,6 +899,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
   menuButton: {
     padding: 6,
     marginLeft: 8,
@@ -585,8 +929,27 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     fontFamily: 'monospace',
   },
-  deleteButton: {
+  channelActions: {
+    flexDirection: 'row',
+    gap: 8,
     marginTop: 8,
+  },
+  simulatorButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#28a745',
+  },
+  simulatorButtonText: {
+    color: '#28a745',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    flex: 1,
     backgroundColor: '#ff4444',
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -624,6 +987,25 @@ const styles = StyleSheet.create({
   retryBtn: { alignSelf: 'flex-start', backgroundColor: '#922b21', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 },
   cardsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   metricCard: { width: '47%', borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
-  chartCard: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ccc', alignItems: 'center' },
-  chartTitle: { marginBottom: 4, fontSize: 12 },
+  subIndicesContainer: { marginTop: 16, gap: 8 },
+  subIndicesRow: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  subIndexCard: { flex: 1, borderWidth: 2, borderRadius: 8, padding: 12, alignItems: 'center', gap: 4 },
+  wsStatusContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 12, 
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  modeToggleButton: { 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 6 
+  },
+  wsMetricsBox: {
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+  },
 });

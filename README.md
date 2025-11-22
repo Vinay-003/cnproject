@@ -116,6 +116,37 @@ Then scan the QR code with Expo Go on your phone!
 
 See [PHONE_TESTING.md](PHONE_TESTING.md) for detailed instructions.
 
+## 🔌 Starting the NodeMCU Simulator
+
+### Quick Method (Easiest!)
+1. Open the app on your phone
+2. Navigate to **Home** tab
+3. Tap the **⋮** (three dots) menu on any channel card
+4. Choose **"🚀 Copy Simulator Command"**
+5. Open a terminal on your computer
+6. Navigate to project: `cd /path/to/cnproject/project`
+7. Paste and run the command!
+
+### Manual Method
+In a new terminal, run:
+```bash
+CHANNEL_ID=your_channel_id \
+WRITE_API_KEY=your_write_api_key \
+SERVER_URL=http://192.168.1.12:3000 \
+node simulator/nodemcu.js
+```
+
+**Note**: Replace `your_channel_id` and `your_write_api_key` with values from your channel (available in the app's channel info).
+
+### What the Simulator Does
+- 📊 Generates realistic sensor data every 15 seconds
+- 🌡️ Temperature: 15-35°C with gradual changes
+- 💧 Humidity: 30-80% with gradual changes
+- ☁️ CO₂: 350-2000 ppm with realistic patterns
+- 🌤️ AQI: Calculated from sensor readings (0-500 scale)
+
+The simulator runs continuously until you press Ctrl+C to stop it.
+
 ## Environment Configuration
 
 The application uses environment variables for configuration:
