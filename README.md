@@ -84,7 +84,7 @@ WeatherMonitor/
 
 ### Prerequisites
 1. **On your phone**: Install **Expo Go** app from Play Store/App Store
-2. **Network**: Ensure phone and computer are on the **same WiFi network**
+2. **Network**: Ensure phone and computer are on the **same WiFi network** and do change the hardcoded ip address in this code for backend, frontend and simulator connection. 
 
 ### One-Command Start
 ```bash
@@ -99,7 +99,7 @@ This will:
 ### Manual Start (Alternative)
 ```bash
 # Terminal 1 - Start backend
-npm run start:api
+npm run start:api or run the start-full-stack script in root directory for backend and simulator launching 
 
 # Terminal 2 - Start Expo
 npx expo start --tunnel
@@ -116,28 +116,13 @@ Then scan the QR code with Expo Go on your phone!
 
 See [PHONE_TESTING.md](PHONE_TESTING.md) for detailed instructions.
 
-## 🔌 Starting the NodeMCU Simulator
+## 🔌 Starting the NodeMCU Simulator on frontend 
 
 ### Quick Method (Easiest!)
 1. Open the app on your phone
 2. Navigate to **Home** tab
-3. Tap the **⋮** (three dots) menu on any channel card
-4. Choose **"🚀 Copy Simulator Command"**
-5. Open a terminal on your computer
-6. Navigate to project: `cd /path/to/cnproject/project`
-7. Paste and run the command!
-
-### Manual Method
-In a new terminal, run:
-```bash
-CHANNEL_ID=your_channel_id \
-WRITE_API_KEY=your_write_api_key \
-SERVER_URL=http://192.168.1.12:3000 \
-node simulator/nodemcu.js
-```
-
-**Note**: Replace `your_channel_id` and `your_write_api_key` with values from your channel (available in the app's channel info).
-
+3. Tap start simulator and select which version u want and boom your simulation is started ,now u can toggle in http polling mode and websocekts
+   
 ### What the Simulator Does
 - 📊 Generates realistic sensor data every 15 seconds
 - 🌡️ Temperature: 15-35°C with gradual changes
@@ -154,7 +139,6 @@ The application uses environment variables for configuration:
 - `EXPO_PUBLIC_API_BASE`: Base URL for the API (defaults to http://localhost:3000)
 
 ## Future Improvements
-
 - Add location-based monitoring
 - Implement push notifications for unhealthy air quality alerts
 - Add customizable thresholds and alert settings
